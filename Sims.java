@@ -1,188 +1,299 @@
-// InputMismatchException用于处理输入类型不匹配异常
-import java.util.InputMismatchException;
-// Scanner用于获取用户输入
+import java.sql.*;
 import java.util.Scanner;
+import java.util.InputMismatchException;
 
 class Student {
-    // 私有属性，封装学生的基本信息
-    private String name;    // 学生姓名
-    private String id;      // 学号
-    private int age;        // 年龄
-    private int score;      // 成绩
+    private String name;
+    private String studentId;
+    private int age;
+    private int score;
 
-    // 构造方法，用于创建Student对象时初始化属性
-    public Student(String name, String id, int age, int score) {
-        this.name = name;   // 将参数name赋值给当前对象的name属性
-        this.id = id;       // 将参数id赋值给当前对象的id属性
-        this.age = age;     // 将参数age赋值给当前对象的age属性
-        this.score = score; // 将参数score赋值给当前对象的score属性
+    public Student(String name, String studentId, int age, int score) {
+        this.name = name;
+        this.studentId = studentId;
+        this.age = age;
+        this.score = score;
     }
 
-    // 以下是getter和setter方法，用于访问和修改私有属性
+    // Getter和Setter方法
+    public String getStudentId() { return studentId; }
+    public void setStudentId(String studentId) { this.studentId = studentId; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public int getAge() { return age; }
+    public void setAge(int age) { this.age = age; }
+    public int getScore() { return score; }
+    public void setScore(int score) { this.score = score; }
 
-    // 获取学号
-    public String getId() {return id;}
-    // 设置学号
-    public void setId(String id) {this.id = id;}
-
-    // 获取姓名
-    public String getName() {return name;}
-    // 设置姓名
-    public void setName(String name) {this.name = name;}
-
-    // 获取年龄
-    public int getAge() {return age;}
-    // 设置年龄
-    public void setAge(int age) {this.age = age;}
-
-    // 获取成绩
-    public int getScore() {return score;}
-    // 设置成绩
-    public void setScore(int score) {this.score = score;}
-
-    // 显示学生信息的方法
     public void display() {
-        System.out.println("姓名：" + name + "\t学号：" + id + "\t年龄：" + age + "\t成绩：" + score);
+        System.out.println("姓名：" + name + "\t学号：" + studentId + "\t年龄：" + age + "\t成绩：" + score);
     }
 }
 
 public class Sims {
+    // 数据库连接信息 - 请根据你的实际情况修改
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/sims";
+    private static final String DB_USER = "root";  // 默认用户名
+    private static final String DB_PASSWORD = "iruo1122";  // 修改为你的MySQL密码
 
-    // 显示系统菜单的方法
-    public static void showMenu() {
-        System.out.println("===== 学生信息管理系统 =====");
-        System.out.println("1.添加学生");
-        System.out.println("2.显示所有学生");
-        System.out.println("3.查找学生");
-        System.out.println("4.统计信息");
-        System.out.println("5.退出系统");
+    // 获取数据库连接
+    private static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
     }
 
-    // 获取有效字符串输入的方法
-    // 参数scanner：Scanner对象用于获取输入
-    // 参数prompt：提示信息，告诉用户需要输入什么
-    private static String getValidString(Scanner scanner, String prompt) {
-        System.out.print(prompt);  // 显示提示信息
-        return scanner.next();     // 获取用户输入的字符串
+    // 初始化数据库表（如果不存在则创建）
+    private static void initializeDatabase() {
+        String createTableSQL = "CREATE TABLE IF NOT EXISTS students (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT," +
+                "student_id VARCHAR(20) NOT NULL UNIQUE," +
+                "name VARCHAR(50) NOT NULL," +
+                "age INT NOT NULL," +
+                "score INT NOT NULL," +
+                "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP," +
+                "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(createTableSQL);
+            System.out.println("数据库初始化成功！");
+        } catch (SQLException e) {
+            System.out.println("数据库初始化失败：" + e.getMessage());
+        }
     }
 
-    // 获取有效整数输入的方法
-    // 使用循环确保用户必须输入正确的整数
-    private static int getValidInt(Scanner scanner, String prompt) {
-        while (true) {  // 无限循环，直到获取到有效的整数
-            System.out.print(prompt);  // 显示提示信息
-            try {
-                return scanner.nextInt();  // 尝试获取整数输入
-            } catch (InputMismatchException e) {
-                // 如果输入的不是整数，捕获异常
-                System.out.println("非法输入，请输入数字！");
-                scanner.next();  // 清除错误的输入，避免死循环
+    // 添加学生到数据库
+    private static void addStudentToDB(Student student) {
+        String sql = "INSERT INTO students (student_id, name, age, score) VALUES (?, ?, ?, ?)";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, student.getStudentId());
+            pstmt.setString(2, student.getName());
+            pstmt.setInt(3, student.getAge());
+            pstmt.setInt(4, student.getScore());
+
+            int rowsAffected = pstmt.executeUpdate();
+            if (rowsAffected > 0) {
+                System.out.println("学生信息已成功保存到数据库！");
+            }
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1062) { // 重复学号错误
+                System.out.println("错误：学号 " + student.getStudentId() + " 已存在！");
+            } else {
+                System.out.println("数据库错误：" + e.getMessage());
             }
         }
     }
 
-    // 主方法，程序的入口点
+    // 从数据库读取所有学生
+    private static void displayAllStudentsFromDB() {
+        String sql = "SELECT student_id, name, age, score FROM students ORDER BY id";
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            boolean hasData = false;
+            while (rs.next()) {
+                hasData = true;
+                String studentId = rs.getString("student_id");
+                String name = rs.getString("name");
+                int age = rs.getInt("age");
+                int score = rs.getInt("score");
+
+                Student student = new Student(name, studentId, age, score);
+                student.display();
+            }
+
+            if (!hasData) {
+                System.out.println("数据库中暂无学生信息！");
+            }
+        } catch (SQLException e) {
+            System.out.println("读取数据失败：" + e.getMessage());
+        }
+    }
+
+    // 从数据库查找学生
+    private static void searchStudentInDB(String searchId) {
+        String sql = "SELECT student_id, name, age, score FROM students WHERE student_id = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, searchId);
+            ResultSet rs = pstmt.executeQuery();
+
+            boolean found = false;
+            while (rs.next()) {
+                found = true;
+                String studentId = rs.getString("student_id");
+                String name = rs.getString("name");
+                int age = rs.getInt("age");
+                int score = rs.getInt("score");
+
+                Student student = new Student(name, studentId, age, score);
+                student.display();
+            }
+
+            if (!found) {
+                System.out.println("未找到学号为 " + searchId + " 的学生！");
+            }
+
+            rs.close();
+        } catch (SQLException e) {
+            System.out.println("查找失败：" + e.getMessage());
+        }
+    }
+
+    // 从数据库统计信息
+    private static void showStatisticsFromDB() {
+        String countSQL = "SELECT COUNT(*) as total FROM students";
+        String scoreSQL = "SELECT AVG(score) as avg_score, MAX(score) as max_score, MIN(score) as min_score FROM students";
+
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+
+            // 获取学生总数
+            ResultSet rs1 = stmt.executeQuery(countSQL);
+            int total = 0;
+            if (rs1.next()) {
+                total = rs1.getInt("total");
+            }
+            rs1.close();
+
+            if (total == 0) {
+                System.out.println("数据库中暂无学生信息！");
+                return;
+            }
+
+            // 获取统计信息
+            ResultSet rs2 = stmt.executeQuery(scoreSQL);
+            if (rs2.next()) {
+                double avgScore = rs2.getDouble("avg_score");
+                int maxScore = rs2.getInt("max_score");
+                int minScore = rs2.getInt("min_score");
+
+                System.out.println("学生总数：" + total);
+                System.out.printf("平均分：%.2f\n", avgScore);
+                System.out.println("最高分：" + maxScore);
+                System.out.println("最低分：" + minScore);
+            }
+            rs2.close();
+
+        } catch (SQLException e) {
+            System.out.println("统计失败：" + e.getMessage());
+        }
+    }
+
+    // 获取有效字符串输入
+    private static String getValidString(Scanner scanner, String prompt) {
+        System.out.print(prompt);
+        return scanner.next();
+    }
+
+    // 获取有效整数输入
+    private static int getValidInt(Scanner scanner, String prompt) {
+        while (true) {
+            System.out.print(prompt);
+            try {
+                return scanner.nextInt();
+            } catch (InputMismatchException e) {
+                System.out.println("非法输入，请输入数字！");
+                scanner.next();
+            }
+        }
+    }
+
+    // 显示菜单
+    public static void showMenu() {
+        System.out.println("\n===== 学生信息管理系统 =====");
+        System.out.println("1. 添加学生");
+        System.out.println("2. 显示所有学生");
+        System.out.println("3. 查找学生");
+        System.out.println("4. 统计信息");
+        System.out.println("5. 删除学生");
+        System.out.println("6. 退出系统");
+    }
+
+    // 删除学生
+    private static void deleteStudentFromDB(String studentId) {
+        String sql = "DELETE FROM students WHERE student_id = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setString(1, studentId);
+            int rowsAffected = pstmt.executeUpdate();
+
+            if (rowsAffected > 0) {
+                System.out.println("学号为 " + studentId + " 的学生信息已删除！");
+            } else {
+                System.out.println("未找到学号为 " + studentId + " 的学生！");
+            }
+        } catch (SQLException e) {
+            System.out.println("删除失败：" + e.getMessage());
+        }
+    }
+
     public static void main(String[] args) {
-        // 创建学生数组，最多存储100个学生对象
-        Student[] students = new Student[100];
-        int count = 0;  // 记录当前已存储的学生数量
+        // 加载MySQL驱动
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            System.out.println("MySQL驱动加载成功！");
+        } catch (ClassNotFoundException e) {
+            System.out.println("找不到MySQL驱动！");
+            System.out.println("请确保已添加mysql-connector-java.jar到项目中");
+            return;
+        }
+
+        // 初始化数据库
+        initializeDatabase();
+
         Scanner scanner = new Scanner(System.in);
 
-        // 主循环，持续运行直到用户选择退出
         while (true) {
-            showMenu();  // 显示菜单
+            showMenu();
             int choice = getValidInt(scanner, "请选择操作：");
+
             switch (choice) {
-                case 1:  // 添加学生
-                    if (count >= 100) {  // 检查数组是否已满
-                        System.out.println("学生数量已达上限");
-                        break;  // 跳出switch，返回主循环
-                    }
-                    // 获取学生信息
+                case 1: // 添加学生
                     String name = getValidString(scanner, "请输入姓名：");
-                    String id = getValidString(scanner, "请输入学号：");
+                    String studentId = getValidString(scanner, "请输入学号：");
                     int age = getValidInt(scanner, "请输入年龄：");
                     int score = getValidInt(scanner, "请输入成绩：");
 
-                    // 创建新的Student对象并存储到数组中
-                    students[count] = new Student(name, id, age, score);
-                    count++;  // 学生数量加1
+                    Student student = new Student(name, studentId, age, score);
+                    addStudentToDB(student);
                     break;
 
-                case 2:  // 显示所有学生
-                    // 遍历数组中所有已存储的学生
-                    for (int i = 0; i < count; i++) {
-                        students[i].display();  // 调用display()方法显示学生信息
-                    }
+                case 2: // 显示所有学生
+                    displayAllStudentsFromDB();
                     break;
 
-                case 3:  // 查找学生
-                    if (count == 0) {  // 检查是否有学生信息
-                        System.out.println("暂无学生信息！");
-                        break;
-                    }
-
-                    System.out.print("请输入要查找的学号：");
-                    String searchId = scanner.next();  // 获取要查找的学号
-                    boolean found = false;  // 标记是否找到学生
-
-                    // 遍历学生数组查找匹配的学号
-                    for (int i = 0; i < count; i++) {
-                        if (students[i].getId().equals(searchId)) {  // 比较学号是否相等
-                            students[i].display();  // 显示找到的学生信息
-                            found = true;  // 标记为已找到
-                        }
-                    }
-
-                    if (!found) {  // 如果循环结束仍未找到
-                        System.out.println("未找到该学生！");
-                    }
+                case 3: // 查找学生
+                    String searchId = getValidString(scanner, "请输入要查找的学号：");
+                    searchStudentInDB(searchId);
                     break;
 
-                case 4:  // 统计信息
-                    if (count == 0) {  // 检查是否有学生信息
-                        System.out.println("暂无学生信息！");
-                    } else {
-                        // 初始化统计变量
-                        int totalScore = 0;  // 总分
-                        int maxScore = Integer.MIN_VALUE;  // 最高分，初始化为最小整数
-                        int minScore = Integer.MAX_VALUE;  // 最低分，初始化为最大整数
-
-                        // 遍历所有学生计算统计信息
-                        for (int i = 0; i < count; i++) {
-                            int studentScore = students[i].getScore();  // 获取当前学生成绩
-                            totalScore += studentScore;  // 累加到总分
-
-                            // 更新最高分
-                            if (studentScore > maxScore) {
-                                maxScore = studentScore;
-                            }
-
-                            // 更新最低分
-                            if (studentScore < minScore) {
-                                minScore = studentScore;
-                            }
-                        }
-
-                        // 计算平均分
-                        double average = (double) totalScore / count;
-
-                        // 输出统计结果
-                        System.out.println("学生总数：" + count);
-                        System.out.println("平均分：" + average);
-                        System.out.println("最高分：" + maxScore);
-                        System.out.println("最低分" + minScore);
-                    }
+                case 4: // 统计信息
+                    showStatisticsFromDB();
                     break;
 
-                case 5:  // 退出系统
-                    System.out.println("感谢使用，再见");
-                    scanner.close();  // 关闭Scanner对象，释放资源
-                    return;  // 结束main方法，退出程序
+                case 5: // 删除学生
+                    String deleteId = getValidString(scanner, "请输入要删除的学生学号：");
+                    deleteStudentFromDB(deleteId);
+                    break;
 
-                default:  // 处理无效的菜单选择
+                case 6: // 退出系统
+                    System.out.println("感谢使用，再见！");
+                    scanner.close();
+                    return;
+
+                default:
                     System.out.println("输入错误，请重新输入！");
-            }  // switch语句结束
-        }  // while循环结束
-    }  // main方法结束
-}  // Sims类结束
+            }
+        }
+    }
+}
